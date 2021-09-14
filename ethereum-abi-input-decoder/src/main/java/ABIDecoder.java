@@ -1,3 +1,4 @@
+import org.apache.commons.lang3.StringUtils;
 import util.ABIHexUtil;
 
 import java.math.BigInteger;
@@ -14,20 +15,17 @@ public class ABIDecoder {
 
     private List<String> types = new ArrayList<>();
     private List<String> values = new ArrayList<>();
-    private Map<Integer, String> results;
-    private int paramIndex;
+    private List<String> results;
 
-    public void run(String paramTypes, String paramInput) {
+    public String run(String paramTypes, String paramInput) {
         parseParamTypes(paramTypes);
         parseParamInput(paramInput);
-        results = new HashMap();
-        paramIndex = 1;
+        results = new ArrayList<>();
 
         decode();
 
-        for (Map.Entry entry : results.entrySet()) {
-            System.out.println(entry.getKey() +": "+ entry.getValue());
-        }
+        String result = StringUtils.join(results, ",");
+        return result;
     }
 
     public void parseParamTypes(String paramTypes) {
@@ -78,8 +76,11 @@ public class ABIDecoder {
                 i--;
             }
 
+            //类型中含有非法符号
             else {
-                System.out.println("未知数据类型：" + type);
+                //System.out.println("未知数据类型：" + type);
+                results.clear();
+                return;
             }
         }
     }
@@ -94,26 +95,31 @@ public class ABIDecoder {
         //uint4...256或int4...256
         if (type.contains("int")) {
             BigInteger integer = ABIHexUtil.Hex32ToUInt(values.get(i));
-            results.put(paramIndex++, integer.toString());
+            results.add(integer.toString());
         }
 
         //bytes4...256
         else if (type.matches("bytes[\\d]+")) {
             //String bytes = ABIHexUtil.Hex32ToBytes(values.get(i));
             String bytes = values.get(i);
-            results.put(paramIndex++, trimZero(bytes));
+            results.add(trimZero(bytes));
         }
 
         //address
         else if (type.equals("address")) {
             String address = ABIHexUtil.addressToHex32(values.get(i));
-            results.put(paramIndex++, address);
+            results.add(address);
         }
 
         //bool
         else if (type.contains("bool")) {
             boolean flag = ABIHexUtil.Hex32ToBool(values.get(i));
-            results.put(paramIndex++, String.valueOf(flag));
+            results.add(String.valueOf(flag));
+
+        //未知类型
+        } else {
+            //System.out.println("未知类型按静态数据类型处理：" + type);
+            results.add(values.get(i));
         }
 
         types.remove(type);
@@ -137,7 +143,7 @@ public class ABIDecoder {
             values.remove(values.get(i+c));
         }
         types.remove(type);
-        results.put(paramIndex++, String.valueOf(buffer));
+        results.add(String.valueOf(buffer));
     }
 
     public void parseDynamicArray(int i) {
@@ -172,7 +178,7 @@ public class ABIDecoder {
         }
 
         types.remove(type);
-        results.put(paramIndex++, String.valueOf(buffer));
+        results.add(String.valueOf(buffer));
     }
 
     public String trimZero(String value) {
